@@ -1,0 +1,87 @@
+# Detecting Fraudulent Transactions Using Supervised Machine Learning
+
+## Step 1: Import Libraries
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from xgboost import XGBClassifier
+
+from imblearn.over_sampling import SMOTE
+
+import warnings
+warnings.filterwarnings('ignore')
+
+## Step 2: Load Dataset
+import kagglehub
+
+# Download latest version
+path = kagglehub.dataset_download("mlg-ulb/creditcardfraud")
+print("Path to dataset files:", path)
+
+# Load the dataset from the correct folder
+data = pd.read_csv('/kaggle/input/creditcardfraud/creditcard.csv')
+
+print("Dataset loaded successfully.")
+print(data.info())
+
+## Step 3: Preprocessing
+# Normalize 'Amount'
+scaler = StandardScaler()
+data['Amount'] = scaler.fit_transform(data[['Amount']])
+
+# Define features and labels
+X = data.drop(['Class'], axis=1)
+y = data['Class']
+
+# Address class imbalance using SMOTE
+sm = SMOTE(random_state=42)
+X_res, y_res = sm.fit_resample(X, y)
+
+print(f"After SMOTE: {y_res.value_counts()}")
+
+# Train-test split
+X_train, X_test, y_train, y_test = train_test_split(X_res, y_res, test_size=0.2, random_state=42, stratify=y_res)
+
+## Step 5: Evaluate Models with ROC Curves
+plt.figure(figsize=(10, 6))
+
+for name, result in results.items():
+    model = result["model"]
+    y_prob = model.predict_proba(X_test)[:, 1]  # Probabilities for ROC
+    fpr, tpr, _ = roc_curve(y_test, y_prob)
+    plt.plot(fpr, tpr, label=f'{name} (AUC = {result["roc_auc"]:.2f})')
+
+# Baseline (random guessing)
+plt.plot([0, 1], [0, 1], 'k--')
+
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('ROC Curves for All Models')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+## Step 6: Save the Best Model (Dynamic Selection)
+from joblib import dump
+
+# Automatically identify the best model by ROC-AUC
+best_model_name = max(results, key=lambda name: results[name]['roc_auc'])
+best_model = results[best_model_name]['model']
+
+# Save the best model
+file_name = f"best_model_{best_model_name.replace(' ', '_').lower()}.joblib"
+dump(best_model, file_name)
+
+print(f"Best Model: {best_model_name}")
+print(f"Saved as: {file_name}")
